@@ -288,6 +288,93 @@ cd python && python3 server.py --module ../examples/simple_math/impl.py
 - Go ↔ Rust
 - And more...
 
+## Dependency Tree Handling
+
+One of the most challenging aspects of code transpilation is handling the **entire dependency tree**. When transpiling a package, you can't just translate the top-level code - you need to handle all the dependencies it imports, and their dependencies, recursively down the tree.
+
+### The Dependency Challenge
+
+Consider transpiling a Python package to Rust:
+
+```
+your_package/
+├── main.py (imports numpy, requests, custom_utils)
+│
+└── Dependencies:
+    ├── numpy (imports multiarray, ufunc, linalg...)
+    │   └── Sub-dependencies: mkl, openblas...
+    ├── requests (imports urllib3, certifi, charset_normalizer...)
+    │   └── Sub-dependencies: idna, PySocks...
+    └── custom_utils (imports pandas, scipy...)
+        └── Sub-dependencies: pytz, dateutil...
+```
+
+**Naive approach**: Transpile everything → Massive effort, most code unused
+**Smart approach**: Transpile only what's actually called → Minimal, efficient
+
+### Selective Dependency Rewriting
+
+TranspileAI uses **static analysis and runtime profiling** to identify which parts of dependencies are actually required:
+
+1. **Call Graph Analysis**: Build a complete call graph from your entry point
+2. **Dead Code Elimination**: Identify functions/classes that are never invoked
+3. **Minimal Transpilation**: Only rewrite the subset of dependency code that's actually used
+4. **Native Bindings**: Map to native libraries where possible (e.g., `numpy` → `ndarray`, `requests` → `reqwest`)
+
+### Example: Minimal Dependency Rewrite
+
+If your Python code only uses `numpy.array()` and `numpy.dot()`:
+
+```python
+# Original Python
+import numpy as np
+
+def compute(data):
+    arr = np.array(data)
+    return np.dot(arr, arr.T)
+```
+
+TranspileAI would:
+- ✅ Transpile `numpy.array()` → map to `ndarray::Array::from_vec()`
+- ✅ Transpile `numpy.dot()` → map to `ndarray` dot product
+- ❌ Skip transpiling unused numpy functions (fft, linalg.svd, random, etc.)
+- ✅ Result: Minimal Rust code with native performance
+
+### Integration with tsrs
+
+For TypeScript/JavaScript → Rust transpilation, this project integrates with **[tsrs](https://github.com/GeorgePearse/tsrs)**, which handles:
+
+- TypeScript type system mapping to Rust types
+- npm dependency resolution and selective inclusion
+- JavaScript runtime feature detection (async/await, Promises, etc.)
+- Bundler integration for tree-shaking before transpilation
+
+### Dependency Resolution Strategies
+
+1. **Direct Mapping**: `requests` (Python) → `reqwest` (Rust), `axios` (JS) → `reqwest` (Rust)
+2. **Polyfill Generation**: For language-specific features not available in target
+3. **Inline Vendoring**: Copy minimal required code from dependencies
+4. **Foreign Function Interface (FFI)**: Keep critical dependencies in original language via FFI when transpilation is impractical
+
+### Challenges & Solutions
+
+| Challenge | Solution |
+|-----------|----------|
+| **Dynamic imports** | Static analysis + runtime profiling to capture all code paths |
+| **Reflection/metaprogramming** | Partial evaluation and code specialization |
+| **C extensions** | FFI bindings or rewrite in unsafe Rust |
+| **Version conflicts** | Dependency pinning and compatibility layers |
+| **Circular dependencies** | Dependency graph restructuring |
+
+### Future Work
+
+- **Automated dependency mapping**: LLM-powered matching of equivalent libraries across languages
+- **Incremental transpilation**: Only re-transpile changed dependencies
+- **Dependency caching**: Reuse previously transpiled dependency code
+- **Community library mappings**: Crowdsourced database of library equivalents (e.g., `pandas` → `polars`)
+
+**Note**: Handling dependencies is an active area of development. The gRPC testing infrastructure ensures that any transpiled dependency code behaves identically to the original implementation.
+
 ## Research Resources
 
 ### Classic Program Synthesis
