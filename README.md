@@ -53,27 +53,231 @@ TranspileAI combines the best of both worlds:
 
 ```
 TranspileAI/
-├── src/
-│   ├── main.rs          # Entry point
-│   ├── parser/          # Language-specific parsers
-│   ├── analyzer/        # Code analysis and understanding
-│   ├── translator/      # Translation engine
-│   └── validator/       # Output validation and testing
-├── tests/               # Test suites
-└── examples/            # Example translations
+├── proto/                           # gRPC service definitions
+│   └── transpile_test.proto        # Cross-language test protocol
+├── python/                          # Python test server
+│   ├── server.py                   # gRPC server implementation
+│   ├── requirements.txt            # Python dependencies
+│   └── generate_proto.sh           # Proto code generation
+├── rust/                            # Rust test server
+│   ├── src/
+│   │   ├── server.rs               # gRPC server implementation
+│   │   └── examples.rs             # Example function registry
+│   ├── Cargo.toml                  # Rust dependencies
+│   └── build.rs                    # Proto code generation
+├── test-runner/                     # Test orchestration
+│   ├── src/main.rs                 # Test runner CLI
+│   ├── test-defs/                  # YAML test definitions
+│   │   └── simple_math.yaml        # Example tests
+│   └── Cargo.toml                  # Dependencies
+└── examples/                        # Example implementations
+    └── simple_math/
+        ├── impl.py                 # Python implementation
+        └── impl.rs                 # Rust implementation
+```
+
+## Cross-Language Testing Infrastructure
+
+TranspileAI uses a **gRPC-based testing infrastructure** to validate that transpiled code produces identical behavior across different language implementations. This approach ensures correctness by running the same tests against both the original and transpiled code.
+
+### Why gRPC?
+
+After consulting multiple AI models (GPT-5-Pro, Gemini-2.5-Pro, Grok-4), we chose gRPC with Protocol Buffers for:
+
+1. **Strong Type Safety**: Protobuf's explicit types (int32, int64, float, etc.) catch transpilation bugs like integer overflow that REST/JSON would miss
+2. **Single Source of Truth**: `.proto` files define the contract that all language implementations must follow
+3. **State Management**: Built-in support for stateful testing via context IDs
+4. **Extensibility**: Adding new languages is straightforward - generate stubs from existing `.proto` files
+5. **Performance**: Binary protocol with minimal overhead
+
+### Testing Architecture
+
+```
+┌─────────────────┐
+│  Test Runner    │  ← Reads YAML test definitions
+└────────┬────────┘
+         │
+    ┌────┴────┐
+    ▼         ▼
+┌────────┐ ┌────────┐
+│ Python │ │  Rust  │  ← Both implement same gRPC service
+│ Server │ │ Server │
+└────────┘ └────────┘
+    │         │
+    └────┬────┘
+         ▼
+   Compare Results
+```
+
+### Quick Start
+
+#### 1. Install Dependencies
+
+**Python:**
+```bash
+cd python
+pip3 install -r requirements.txt
+./generate_proto.sh
+```
+
+**Rust:**
+```bash
+cd rust
+cargo build
+```
+
+**Test Runner:**
+```bash
+cd test-runner
+cargo build --release
+```
+
+#### 2. Start Test Servers
+
+**Terminal 1 - Python Server:**
+```bash
+cd python
+python3 server.py --port 50051 --module ../examples/simple_math/impl.py
+```
+
+**Terminal 2 - Rust Server:**
+```bash
+cd rust
+cargo run --bin test-server -- --port 50052
+```
+
+#### 3. Run Tests
+
+**Terminal 3 - Test Runner:**
+```bash
+cd test-runner
+cargo run --release -- --suite test-defs/simple_math.yaml
+```
+
+Example output:
+```
+================================================================================
+Test Suite: Simple Math Functions
+================================================================================
+
+  ✓ add_positive_numbers
+    ⏱  Python: 152μs | Rust: 89μs
+    Result: 8
+
+  ✓ fibonacci_20
+    ⏱  Python: 2847μs | Rust: 1203μs
+    Result: 6765
+
+  ✓ is_prime_97
+    ⏱  Python: 1821μs | Rust: 743μs
+    Result: true
+
+================================================================================
+Summary: 25/25 passed
+================================================================================
+```
+
+### Writing Tests
+
+Tests are defined in YAML format:
+
+```yaml
+name: My Test Suite
+description: Tests for my transpiled code
+
+servers:
+  python:
+    host: localhost
+    port: 50051
+  rust:
+    host: localhost
+    port: 50052
+
+tests:
+  - name: test_add
+    description: Add two numbers
+    method: add
+    arguments:
+      a: 5
+      b: 3
+    expected: 8
+
+  - name: test_stateful_counter
+    description: Test stateful operations
+    method: counter_increment
+    stateful: true
+    initial_state: '{"counter": 0}'
+    arguments: {}
+    expected: 1
+```
+
+### Implementing Functions
+
+**Python** (`@transpile_test` decorator):
+```python
+from server import transpile_test
+
+@transpile_test(
+    name="add",
+    description="Add two numbers",
+    is_stateful=False,
+    parameter_types=["int", "int"],
+    return_type="int",
+)
+def add(context, a, b):
+    return a + b
+```
+
+**Rust** (register in examples module):
+```rust
+server.register_function(
+    "add",
+    |_ctx, args| {
+        let a = args["a"].as_i64().ok_or("Missing 'a'")?;
+        let b = args["b"].as_i64().ok_or("Missing 'b'")?;
+        Ok(json!(a + b))
+    },
+    "Add two numbers",
+    false,  // is_stateful
+    vec!["int".to_string(), "int".to_string()],
+    "int",
+);
+```
+
+### Key Features
+
+- **Stateless Functions**: Pure functions with no side effects
+- **Stateful Operations**: Functions that maintain state across calls using context IDs
+- **Test Isolation**: Each test gets its own execution context
+- **Performance Metrics**: Execution time tracking for both implementations
+- **Language-Agnostic**: Same tests run against all language implementations
+- **Property-Based Testing**: Integration with Hypothesis (Python) and proptest (Rust) planned
+
+### Debugging
+
+List available methods:
+```bash
+grpcurl -plaintext localhost:50051 transpile_test.TranspileTestService/ListMethods
+```
+
+Manually invoke a function:
+```bash
+grpcurl -plaintext -d '{"method_name": "add", "arguments": "{\"a\": 5, \"b\": 3}"}' \
+  localhost:50051 transpile_test.TranspileTestService/InvokeMethod
 ```
 
 ## Getting Started
 
 ```bash
-# Build the project
+# Build the transpiler (planned)
 cargo build
 
-# Run tests
-cargo test
+# Run cross-language tests
+cd test-runner
+cargo run --release -- --suite test-defs/simple_math.yaml
 
-# Run the transpiler
-cargo run -- --help
+# Start interactive testing
+cd python && python3 server.py --module ../examples/simple_math/impl.py
 ```
 
 ## Supported Languages (Planned)

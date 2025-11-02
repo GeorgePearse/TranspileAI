@@ -1,0 +1,112 @@
+syntax = "proto3";
+
+package transpile_test;
+
+// Service for executing transpiled code tests
+service TranspileTestService {
+  // Create a new execution context for stateful testing
+  rpc CreateContext(CreateContextRequest) returns (CreateContextResponse);
+
+  // Invoke a method within a context
+  rpc InvokeMethod(InvokeMethodRequest) returns (InvokeMethodResponse);
+
+  // Inspect the current state of a context (for debugging)
+  rpc InspectState(InspectStateRequest) returns (InspectStateResponse);
+
+  // Destroy a context and clean up resources
+  rpc DestroyContext(DestroyContextRequest) returns (DestroyContextResponse);
+
+  // List available methods that can be invoked
+  rpc ListMethods(ListMethodsRequest) returns (ListMethodsResponse);
+}
+
+// Request to create a new execution context
+message CreateContextRequest {
+  // Optional initial state as JSON
+  string initial_state = 1;
+}
+
+message CreateContextResponse {
+  string context_id = 1;
+  bool success = 2;
+  string error = 3;
+}
+
+// Request to invoke a method
+message InvokeMethodRequest {
+  // Context ID (empty string for stateless calls)
+  string context_id = 1;
+
+  // Method name to invoke
+  string method_name = 2;
+
+  // Arguments serialized as JSON
+  string arguments = 3;
+}
+
+message InvokeMethodResponse {
+  bool success = 1;
+
+  // Result serialized as JSON
+  string result = 2;
+
+  // Error message if success = false
+  string error = 3;
+
+  // Execution metadata
+  ExecutionMetadata metadata = 4;
+}
+
+// Metadata about method execution
+message ExecutionMetadata {
+  // Execution time in microseconds
+  int64 execution_time_us = 1;
+
+  // Memory used in bytes (if available)
+  int64 memory_bytes = 2;
+
+  // Language runtime (python, rust, etc.)
+  string runtime = 3;
+}
+
+// Request to inspect context state
+message InspectStateRequest {
+  string context_id = 1;
+}
+
+message InspectStateResponse {
+  bool success = 1;
+
+  // Current state serialized as JSON
+  string state = 2;
+
+  string error = 3;
+}
+
+// Request to destroy a context
+message DestroyContextRequest {
+  string context_id = 1;
+}
+
+message DestroyContextResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+// Request to list available methods
+message ListMethodsRequest {
+  // Optional filter by prefix
+  string prefix = 1;
+}
+
+message ListMethodsResponse {
+  repeated MethodInfo methods = 1;
+}
+
+message MethodInfo {
+  string name = 1;
+  string description = 2;
+  bool is_stateful = 3;
+  repeated string parameter_types = 4;
+  string return_type = 5;
+}

@@ -1,0 +1,162 @@
+name: Simple Math Functions
+description: Test basic mathematical operations across Python and Rust implementations
+
+servers:
+  python:
+    host: localhost
+    port: 50051
+  rust:
+    host: localhost
+    port: 50052
+
+tests:
+  # Basic arithmetic tests
+  - name: add_positive_numbers
+    description: Add two positive integers
+    method: add
+    arguments:
+      a: 5
+      b: 3
+    expected: 8
+
+  - name: add_negative_numbers
+    description: Add negative integers
+    method: add
+    arguments:
+      a: -10
+      b: -20
+    expected: -30
+
+  - name: multiply_positive
+    description: Multiply two positive integers
+    method: multiply
+    arguments:
+      a: 6
+      b: 7
+    expected: 42
+
+  - name: multiply_by_zero
+    description: Multiply by zero
+    method: multiply
+    arguments:
+      a: 999
+      b: 0
+    expected: 0
+
+  # Fibonacci tests
+  - name: fibonacci_base_case_0
+    description: Fibonacci of 0
+    method: fibonacci
+    arguments:
+      n: 0
+    expected: 0
+
+  - name: fibonacci_base_case_1
+    description: Fibonacci of 1
+    method: fibonacci
+    arguments:
+      n: 1
+    expected: 1
+
+  - name: fibonacci_10
+    description: 10th Fibonacci number
+    method: fibonacci
+    arguments:
+      n: 10
+    expected: 55
+
+  - name: fibonacci_20
+    description: 20th Fibonacci number
+    method: fibonacci
+    arguments:
+      n: 20
+    expected: 6765
+
+  # Factorial tests
+  - name: factorial_0
+    description: Factorial of 0
+    method: factorial
+    arguments:
+      n: 0
+    expected: 1
+
+  - name: factorial_1
+    description: Factorial of 1
+    method: factorial
+    arguments:
+      n: 1
+    expected: 1
+
+  - name: factorial_5
+    description: Factorial of 5
+    method: factorial
+    arguments:
+      n: 5
+    expected: 120
+
+  - name: factorial_10
+    description: Factorial of 10
+    method: factorial
+    arguments:
+      n: 10
+    expected: 3628800
+
+  # Prime number tests
+  - name: is_prime_2
+    description: 2 is prime
+    method: is_prime
+    arguments:
+      n: 2
+    expected: true
+
+  - name: is_prime_3
+    description: 3 is prime
+    method: is_prime
+    arguments:
+      n: 3
+    expected: true
+
+  - name: is_prime_4
+    description: 4 is not prime
+    method: is_prime
+    arguments:
+      n: 4
+    expected: false
+
+  - name: is_prime_17
+    description: 17 is prime
+    method: is_prime
+    arguments:
+      n: 17
+    expected: true
+
+  - name: is_prime_100
+    description: 100 is not prime
+    method: is_prime
+    arguments:
+      n: 100
+    expected: false
+
+  - name: is_prime_97
+    description: 97 is prime
+    method: is_prime
+    arguments:
+      n: 97
+    expected: true
+
+  # Stateful tests - counter
+  - name: counter_increment_once
+    description: Increment counter from initial state
+    method: counter_increment
+    stateful: true
+    initial_state: '{"counter": 0}'
+    arguments: {}
+    expected: 1
+
+  - name: counter_get_initial
+    description: Get counter initial value
+    method: counter_get
+    stateful: true
+    initial_state: '{"counter": 42}'
+    arguments: {}
+    expected: 42
